@@ -3,7 +3,8 @@ import { routes } from "./routes/routes.js";
 const init = async () => {
   const server = new Hapi.Server({
     port: 3000,
-    host: 'localhost',
+    // eslint-disable-next-line no-undef
+    host: process.env.NODE_ENV !== 'production' ? 'localhost' : '0.0.0.0',
     routes: {
         cors: {
             origin: ["*"]
