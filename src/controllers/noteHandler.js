@@ -98,7 +98,7 @@ export const deleteNote = async (request, h) => {
         const response = h.response({
             status: 'failed',
             message: 'Gagal menghapus note'
-        }).code(500);
+        }).code(404);
         return response;
     }
     
