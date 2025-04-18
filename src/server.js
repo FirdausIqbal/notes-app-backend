@@ -1,18 +1,21 @@
+/* eslint-disable no-undef */
 import Hapi from "@hapi/hapi";
 // import { routes } from "./routes/routes.js";
 import notes from "./api/notes/index.js";
-import { NotesService } from "./services/inMemory/NotesService.js";
+import { NoteService } from "./services/postgres/NoteService.js";
 import { NotesValidator } from "./validator/notes/index.js";
 import { ClientError } from "./exceptions/ClientError.js";
+import dotenv from 'dotenv'
+
+dotenv.config();
 
 const init = async () => {
 
-  const noteService = new NotesService()
+  const noteService = new NoteService()
 
   const server = new Hapi.Server({
-    port: 3000,
-    // eslint-disable-next-line no-undef
-    host: process.env.NODE_ENV !== 'production' ? 'localhost' : '0.0.0.0',
+    port: process.env.PORT,
+    host: process.env.HOST,
     routes: {
         cors: {
             origin: ["*"]
