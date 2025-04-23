@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 export const mapDBToModel = ({
   id,
   title,

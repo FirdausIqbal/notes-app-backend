@@ -6,10 +6,11 @@ import pluginJs from "@eslint/js";
 export default [
   {
     files: ["**/*.js"],
-    languageOptions: { globals: globals.browser },
+    languageOptions: { globals: {
+      ...globals.node,
+    } },
     rules: {
-      "no-unused-vars": "warn",
-      "no-undef": "off"
+      "no-unsued-vars": "off"
     }
   },
   pluginJs.configs.recommended,

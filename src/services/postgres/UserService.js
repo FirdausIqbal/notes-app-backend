@@ -1,0 +1,62 @@
+import pg from 'pg';
+import {InvariantError} from '../../exceptions/InvariantError.js'
+import {NotFoundError} from '../../exceptions/NotFoundError.js'
+import { nanoid } from 'nanoid';
+import bcrypt from 'bcrypt'
+
+export class UserService {
+    constructor(){
+        this._pool = new pg.Pool();
+    }
+
+    async addUser({username, password, fullname}) {
+        // TODO: Verify username apakah sudah digunakan.
+        await this.verifyNewUsername(username)
+        // TODO: buat username baru ke dalam database 
+        const id = `user-${nanoid(16)}`;
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const query = {
+            text: 'INSERT INTO users VALUES($1, $2, $3, $4) RETURNING id',
+            values: [id, username, hashedPassword, fullname]
+        }
+
+        const result = await this._pool.query(query)
+
+        if(!result.rows[0].id) {
+            throw new InvariantError('User gagal ditambahkan')
+        }
+
+        return result.rows[0].id;
+    }
+
+    async getUserById(userId) {
+        const query = {
+            text: 'SELECT * FROM users WHERE id = $1',
+            values: [userId]
+        }
+
+        const resut = await this._pool.query(query);
+
+        if(!resut.rows.length) {
+            throw new NotFoundError('User tidak ditemukan')
+        }
+
+        return resut.rows[0];
+    }
+    
+    async verifyNewUsername(username) {
+        const query = {
+            text: 'SELECT username FROM users WHERE username = $1',
+            values: [username]
+        }
+
+        const result = await this._pool.query(query);
+
+        if (result.rows.length > 0) {
+            throw new InvariantError('Gagal manambahkan user. Username sudah diguanakan.')
+        }
+        
+    }
+
+}

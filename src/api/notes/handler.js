@@ -1,5 +1,3 @@
-/* eslint-disable no-unused-vars */
-// import { ClientError } from "../../exceptions/ClientError.js";
 
 class NotesHandler {
   constructor(service, validator) {
