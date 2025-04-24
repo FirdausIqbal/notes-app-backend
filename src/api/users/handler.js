@@ -36,4 +36,17 @@ export class UserHandler {
 
         return response;
     }
+
+    async getUserByUsernameHandler(request, h) {
+        const { username = ''} = request.query;
+        const users = await this._service.getUserByUsername(username)
+
+        const response = h.response({
+            status: 'success',
+            data: {
+                users
+            }
+        })
+        return response;
+    }
 }

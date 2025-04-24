@@ -1,101 +1,122 @@
-/* eslint-disable no-unused-vars */
-import { nanoid } from 'nanoid';
-import pg from 'pg';
-import { InvariantError } from '../../exceptions/InvariantError.js';
-import { mapDBToModel } from '../../utils/index.js';
-import { NotFoundError } from '../../exceptions/NotFoundError.js';
-import { AuthorizationError } from '../../exceptions/AuthorizationError.js';
+import { nanoid } from "nanoid";
+import pg from "pg";
+import { InvariantError } from "../../exceptions/InvariantError.js";
+import { mapDBToModel } from "../../utils/index.js";
+import { NotFoundError } from "../../exceptions/NotFoundError.js";
+import { AuthorizationError } from "../../exceptions/AuthorizationError.js";
 
 export class NoteService {
-    constructor() {
-        this._pool = new pg.Pool()
+  constructor(collaborationService) {
+    this._pool = new pg.Pool();
+    this._collaborationService = collaborationService;
+  }
+
+  async addNote({ title, body, tags, owner }) {
+    const id = nanoid(16);
+    const createdAt = new Date().toISOString();
+    const updateAt = createdAt;
+
+    const query = {
+      text: "INSERT INTO notes VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+      values: [id, title, body, tags, createdAt, updateAt, owner],
+    };
+
+    const result = await this._pool.query(query);
+
+    if (!result.rows[0].id) {
+      throw new InvariantError("Catatan gagal ditambahkan");
     }
 
-    async addNote({title, body, tags, owner}){
-        const id = nanoid(16);
-        const createdAt = new Date().toISOString();
-        const updateAt = createdAt;
+    return result.rows[0].id;
+  }
 
-        const query = {
-            text: 'INSERT INTO notes VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-            values: [id, title, body, tags, createdAt, updateAt, owner]
-        }
+  async getNotes(owner) {
+    const query = {
+      text: `SELECT notes.* FROM notes
+    LEFT JOIN collaborations ON collaborations.note_id = notes.id
+    WHERE notes.owner = $1 OR collaborations.user_id = $1
+    GROUP BY notes.id`,
+      values: [owner],
+    };
+    const result = await this._pool.query(query);
+    return result.rows.map(mapDBToModel);
+  }
 
-        const result = await this._pool.query(query);
+  async getNoteById(id) {
+    const query = {
+      text: `SELECT notes.*, users.username
+    FROM notes
+    LEFT JOIN users ON users.id = notes.owner
+    WHERE notes.id = $1`,
+      values: [id],
+    };
 
-        if(!result.rows[0].id){
-            throw new InvariantError('Catatan gagal ditambahkan')
-        }
+    const result = await this._pool.query(query);
 
-        return result.rows[0].id;
+    if (!result.rows.length) {
+      throw new NotFoundError("Catatan tidak ditemukan");
     }
 
-    async getNotes(owner) {
-        const query = {
-            text: 'SELECT *FROM notes WHERE owner = $1',
-            values: [owner]
-        }
-        const result = await this._pool.query(query)
-        return result.rows.map(mapDBToModel)
+    return result.rows.map(mapDBToModel)[0];
+  }
+
+  async editNoteById(id, { title, body, tags }) {
+    const updatedAt = new Date().toISOString();
+    const query = {
+      text: "UPDATE notes SET title = $1, body = $2, tags = $3, updated_At = $4 WHERE id = $5 RETURNING id",
+      values: [title, body, tags, updatedAt, id],
+    };
+
+    const result = await this._pool.query(query);
+
+    if (!result.rows.length) {
+      throw new NotFoundError("Gagal memperbarui note");
+    }
+  }
+
+  async deleteNoteById(id) {
+    const query = {
+      text: "DELETE FROM notes WHERE id = $1 RETURNING id",
+      values: [id],
+    };
+
+    const result = await this._pool.query(query);
+
+    if (!result.rows.length) {
+      throw new NotFoundError("Catatan tidak ditemukan");
+    }
+  }
+
+  async verifyNoteOwner(id, owner) {
+    const query = {
+      text: "SELECT * FROM notes WHERE id = $1",
+      values: [id],
+    };
+
+    const result = await this._pool.query(query);
+
+    if (!result.rows.length) {
+      throw new NotFoundError("Catatan tidak ditemukan");
     }
 
-    async getNoteById(id) {
-        const query = {
-            text: 'SELECT * FROM notes WHERE id = $1',
-            values: [id]
-        }
-
-        const result = await this._pool.query(query);
-
-        if(!result.rows.length) {
-            throw new NotFoundError('Catatan tidak ditemukan')
-        }
-
-        return result.rows.map(mapDBToModel)[0];
+    const note = result.rows[0];
+    if (note.owner !== owner) {
+      throw new AuthorizationError("Anda tidak berhak mengakses resource ini");
     }
+  }
 
-    async editNoteById(id, {title, body, tags}) {
-        const updatedAt = new Date().toISOString();
-        const query = {
-            text: 'UPDATE notes SET title = $1, body = $2, tags = $3, updated_At = $4 WHERE id = $5 RETURNING id',
-            values: [title, body, tags, updatedAt, id]
-        }
-
-        const result = await this._pool.query(query);
-
-        if(!result.rows.length) {
-            throw new NotFoundError('Gagal memperbarui note')
-        }
+  async verifyNoteAccess(noteId, userId) {
+    try {
+      await this.verifyNoteOwner(noteId, userId);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      try {
+        await this._collaborationService.verifyCollaboration(noteId, userId);
+      } catch (error) {
+        throw error;
+      }
     }
-
-    async deleteNoteById(id) {
-        const query = {
-            text: 'DELETE FROM notes WHERE id = $1 RETURNING id',
-            values: [id]
-        }
-
-        const result = await this._pool.query(query);
-
-        if(!result.rows.length) {
-            throw new NotFoundError('Catatan tidak ditemukan')
-        }
-    }
-
-    async verifyNoteOwner(id, owner) {
-        const query = {
-            text: 'SELECT * FROM notes WHERE id = $1',
-            values: [id]
-        }
-
-        const result = await this._pool.query(query)
-
-        if(!result.rows.length){
-            throw new NotFoundError('Catatan tidak ditemukan')
-        }
-
-        const note = result.rows[0]
-        if(note.owner !== owner){
-            throw new AuthorizationError('Anda tidak berhak mengakses resource ini')
-        }
-    }
+  }
 }

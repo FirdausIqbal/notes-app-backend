@@ -11,7 +11,8 @@ export default [
     } },
   },{
     rules: {
-      "no-unsued-vars": "off"
+      "no-unsued-vars": "off",
+      "no-useless-catch": "off"
   }
   },
   pluginJs.configs.recommended,
