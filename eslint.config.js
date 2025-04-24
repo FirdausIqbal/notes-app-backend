@@ -9,9 +9,10 @@ export default [
     languageOptions: { globals: {
       ...globals.node,
     } },
+  },{
     rules: {
       "no-unsued-vars": "off"
-    }
+  }
   },
   pluginJs.configs.recommended,
 ];
